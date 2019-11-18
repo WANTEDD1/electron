@@ -55,16 +55,9 @@ describe('node feature', () => {
 
   describe('NODE_OPTIONS', () => {
     let child: childProcess.ChildProcessWithoutNullStreams
-    let exitPromise: Promise<any[]>
 
-    afterEach(async () => {
-      if (child && exitPromise) {
-        const [code, signal] = await exitPromise
-        expect(signal).to.equal(null)
-        expect(code).to.equal(0)
-      } else if (child) {
-        child.kill()
-      }
+    afterEach(() => {
+      if (child) child.kill()
     })
 
     it('fails for options disallowed by Node.js itself', (done) => {
@@ -110,6 +103,68 @@ describe('node feature', () => {
     })
   })
 
+  describe('Node.js cli flags', () => {
+    let child: childProcess.ChildProcessWithoutNullStreams
+
+    afterEach(() => {
+      if (child) child.kill()
+    })
+
+    it('Prohibits crypto-related flags in ELECTRON_RUN_AS_NODE mode', (done) => {
+      child = childProcess.spawn(process.execPath, ['--force-fips'], {
+        env: { ELECTRON_RUN_AS_NODE: 'true' }
+      })
+
+      let output = ''
+      function cleanup () {
+        child.stderr.removeListener('data', errorDataListener)
+        child.stdout.removeListener('data', outDataHandler)
+      }
+
+      function errorDataListener (data: Buffer) {
+        output += data
+        if (/.*The Node.js cli flag --force-fips is not supported in Electron/m.test(output)) {
+          cleanup()
+          done()
+        }
+      }
+
+      function outDataHandler (data: Buffer) {
+        cleanup()
+        done(new Error(`Unexpected output: ${data.toString()}`))
+      }
+
+      child.stderr.on('data', errorDataListener)
+      child.stdout.on('data', outDataHandler)
+    })
+
+    it('Allows debug-related flags to be passed to the Electron executable', (done) => {
+      child = childProcess.spawn(process.execPath, ['--enable-logging', '--inspect'])
+
+      let output = ''
+      function cleanup () {
+        child.stderr.removeListener('data', errorDataListener)
+        child.stdout.removeListener('data', outDataHandler)
+      }
+
+      function errorDataListener (data: Buffer) {
+        output += data
+        if (/^Debugger listening on ws:/m.test(output)) {
+          cleanup()
+          done()
+        }
+      }
+
+      function outDataHandler (data: Buffer) {
+        cleanup()
+        done(new Error(`Unexpected output: ${data.toString()}`))
+      }
+
+      child.stderr.on('data', errorDataListener)
+      child.stdout.on('data', outDataHandler)
+    })
+  })
+
   ifdescribe(features.isRunAsNodeEnabled())('inspector', () => {
     let child: childProcess.ChildProcessWithoutNullStreams
     let exitPromise: Promise<any[]>
@@ -136,6 +191,7 @@ describe('node feature', () => {
         child.stderr.removeListener('data', errorDataListener)
         child.stdout.removeListener('data', outDataHandler)
       }
+
       function errorDataListener (data: Buffer) {
         output += data
         if (/^Debugger listening on ws:/m.test(output)) {
@@ -143,10 +199,12 @@ describe('node feature', () => {
           done()
         }
       }
+
       function outDataHandler (data: Buffer) {
         cleanup()
         done(new Error(`Unexpected output: ${data.toString()}`))
       }
+
       child.stderr.on('data', errorDataListener)
       child.stdout.on('data', outDataHandler)
     })
