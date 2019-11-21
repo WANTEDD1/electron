@@ -12,6 +12,7 @@
 #include "base/files/file_util.h"
 #include "base/strings/pattern.h"
 #include "base/strings/string_util.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/threading/thread_restrictions.h"
 #include "net/base/data_url.h"
 #include "shell/common/asar/asar_util.h"
@@ -541,8 +542,21 @@ bool Converter<electron::api::NativeImage*>::FromV8(
   // Try converting from file path.
   base::FilePath path;
   if (ConvertFromV8(isolate, val, &path)) {
+    // Throw when path is invalid, i.e file doesn't exist
+    base::ThreadRestrictions::ScopedAllowIO allow_io;
+    if (!base::PathExists(path)) {
+#if defined(OS_WIN)
+      std::string err_msg =
+          base::UTF16ToUTF8(path.value()) + " does not exist on disk";
+#else
+      std::string err_msg = path.value() + " does not exist on disk";
+#endif
+      isolate->ThrowException(
+          v8::Exception::Error(StringToV8(isolate, err_msg)));
+      return false;
+    }
+
     *out = electron::api::NativeImage::CreateFromPath(isolate, path).get();
-    // Should throw when failed to initialize from path.
     return !(*out)->image().IsEmpty();
   }
 
