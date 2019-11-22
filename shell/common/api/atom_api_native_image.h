@@ -129,25 +129,4 @@ struct Converter<electron::api::NativeImage*> {
 
 }  // namespace gin
 
-namespace mate {
-
-// Keep compatibility with native_mate code.
-//
-// TODO(zcbenz): Remove this after removing native_mate.
-template <>
-struct Converter<mate::Handle<electron::api::NativeImage>> {
-  static v8::Local<v8::Value> ToV8(
-      v8::Isolate* isolate,
-      const mate::Handle<electron::api::NativeImage>& val) {
-    return gin::ConvertToV8(isolate, val);
-  }
-  static bool FromV8(v8::Isolate* isolate,
-                     v8::Local<v8::Value> val,
-                     mate::Handle<electron::api::NativeImage>* out) {
-    return gin::ConvertFromV8(isolate, val, out);
-  }
-};
-
-}  // namespace mate
-
 #endif  // SHELL_COMMON_API_ATOM_API_NATIVE_IMAGE_H_
